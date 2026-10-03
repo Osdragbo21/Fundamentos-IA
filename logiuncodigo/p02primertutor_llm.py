@@ -28,100 +28,126 @@ mensajes = [{"role": "system", "content": mensaje_sistema}]
 # FUNCIONES DE LA INTERFAZ
 # ============================================================
 def enviar_mensaje(event=None):
-    """Captura el texto, lo muestra y llama al LLM en un hilo separado."""
-    pregunta = entrada_texto.get("1.0", tk.END).strip()
+    pregunta = entrada_texto.get().strip()
     if not pregunta:
-        return "break" # Evitar saltos de línea vacíos
+        return "break"
     
-    # Mostrar mensaje de Osvaldo
-    mostrar_en_chat("Osvaldo", pregunta, "user")
-    entrada_texto.delete("1.0", tk.END)
+    mostrar_en_chat("<Osvaldo>", pregunta, "user")
+    entrada_texto.delete(0, tk.END)
     mensajes.append({"role": "user", "content": pregunta})
     
-    # Bloquear entrada mientras el LLM piensa
     entrada_texto.config(state=tk.DISABLED)
     btn_enviar.config(state=tk.DISABLED)
-    ventana.title("Tutor Inteligente de GitHub - Pensando...")
+    ventana.title("Minecraft - Generando terreno (Pensando)...")
     
-    # Iniciar hilo para no congelar la ventana gráfica
     threading.Thread(target=obtener_respuesta_llm, daemon=True).start()
     return "break"
 
 def obtener_respuesta_llm():
-    """Se comunica con Ollama en segundo plano."""
     try:
         respuesta = ollama.chat(model=MODELO, messages=mensajes)
         contenido = respuesta["message"]["content"]
         mensajes.append({"role": "assistant", "content": contenido})
         
-        # Enviar respuesta a la ventana principal de forma segura
-        ventana.after(0, mostrar_en_chat, "Tutor", contenido, "assistant")
+        ventana.after(0, mostrar_en_chat, "<Tutor_GitHub>", contenido, "assistant")
     except Exception as e:
-        error_msg = f"Error al conectar con Ollama: {str(e)}\n¿Está el servicio activo (sudo systemctl start ollama)?"
-        mensajes.pop() # Quitar la pregunta fallida del historial
-        ventana.after(0, mostrar_en_chat, "Sistema", error_msg, "error")
+        error_msg = f"Error de conexión: {str(e)}"
+        mensajes.pop()
+        ventana.after(0, mostrar_en_chat, "<Sistema>", error_msg, "error")
     finally:
         ventana.after(0, reactivar_interfaz)
 
 def reactivar_interfaz():
-    """Vuelve a habilitar la caja de texto tras recibir respuesta."""
     entrada_texto.config(state=tk.NORMAL)
     btn_enviar.config(state=tk.NORMAL)
-    ventana.title("Tutor Inteligente de GitHub")
+    ventana.title("Tutor Inteligente de GitHub - Edición Bloques")
     entrada_texto.focus()
 
 def mostrar_en_chat(remitente, mensaje, tag):
-    """Inserta el texto en el área de chat con sus colores respectivos."""
     chat_historial.config(state=tk.NORMAL)
-    chat_historial.insert(tk.END, f"{remitente}:\n", f"{tag}_name")
+    chat_historial.insert(tk.END, f"{remitente} ", f"{tag}_name")
     chat_historial.insert(tk.END, f"{mensaje}\n\n", tag)
     chat_historial.config(state=tk.DISABLED)
-    chat_historial.see(tk.END) # Hacer autoscroll hacia abajo
+    chat_historial.see(tk.END)
 
 # ============================================================
-# CONSTRUCCIÓN DE LA VENTANA (TKINTER)
+# CONSTRUCCIÓN DE LA VENTANA (ESTÉTICA MINECRAFT)
 # ============================================================
 ventana = tk.Tk()
-ventana.title("Tutor Inteligente de GitHub")
-ventana.geometry("750x600")
-ventana.configure(bg="#1e1e1e")
+ventana.title("Tutor Inteligente de GitHub - Edición Bloques")
+ventana.geometry("800x600")
+# Fondo gris que simula piedra (Stone)
+ventana.configure(bg="#7B7B7B", padx=15, pady=15)
 
-# Área de historial de chat
-chat_historial = scrolledtext.ScrolledText(ventana, wrap=tk.WORD, font=("Segoe UI", 11), bg="#2d2d2d", fg="#ffffff", padx=15, pady=15, borderwidth=0)
-chat_historial.pack(padx=10, pady=(10, 5), fill=tk.BOTH, expand=True)
+# Fuente retro para simular píxeles
+MC_FONT = ("Courier New", 12, "bold")
 
-# Configuración de colores (Tags)
-chat_historial.tag_config("user_name", foreground="#4da6ff", font=("Segoe UI", 11, "bold"))
-chat_historial.tag_config("user", foreground="#ffffff")
-chat_historial.tag_config("assistant_name", foreground="#33cc33", font=("Segoe UI", 11, "bold"))
-chat_historial.tag_config("assistant", foreground="#d9d9d9")
-chat_historial.tag_config("error_name", foreground="#ff3333", font=("Segoe UI", 11, "bold"))
-chat_historial.tag_config("error", foreground="#ff9999")
+# Área de historial de chat (Fondo oscuro semitransparente clásico del juego)
+chat_historial = scrolledtext.ScrolledText(
+    ventana, 
+    wrap=tk.WORD, 
+    font=MC_FONT, 
+    bg="#1E1E1E", 
+    fg="#FFFFFF", 
+    padx=15, 
+    pady=15, 
+    borderwidth=4, 
+    relief=tk.SUNKEN
+)
+chat_historial.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+
+# Colores inspirados en el chat de Minecraft
+chat_historial.tag_config("user_name", foreground="#FFFF55") # Amarillo MC
+chat_historial.tag_config("user", foreground="#FFFFFF")
+chat_historial.tag_config("assistant_name", foreground="#55FF55") # Verde claro MC
+chat_historial.tag_config("assistant", foreground="#D9D9D9")
+chat_historial.tag_config("error_name", foreground="#FF5555") # Rojo MC
+chat_historial.tag_config("error", foreground="#FF5555")
 chat_historial.config(state=tk.DISABLED)
 
-# Contenedor inferior (Input + Botón)
-frame_inferior = tk.Frame(ventana, bg="#1e1e1e")
-frame_inferior.pack(padx=10, pady=(5, 10), fill=tk.X)
+# Contenedor inferior
+frame_inferior = tk.Frame(ventana, bg="#7B7B7B")
+frame_inferior.pack(fill=tk.X)
 
-entrada_texto = tk.Text(frame_inferior, height=3, font=("Segoe UI", 11), bg="#3d3d3d", fg="#ffffff", insertbackground="white", borderwidth=0, padx=10, pady=10)
-entrada_texto.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-# Enviar con Enter (Shift+Enter para salto de línea)
-entrada_texto.bind("<Return>", lambda e: enviar_mensaje() if not e.state & 0x0001 else None)
+# Label decorativo del input (El clásico ">" del chat)
+lbl_cursor = tk.Label(frame_inferior, text=">", font=MC_FONT, bg="#7B7B7B", fg="#FFFFFF")
+lbl_cursor.pack(side=tk.LEFT, padx=(0, 5))
 
-btn_enviar = tk.Button(frame_inferior, text="Enviar", font=("Segoe UI", 11, "bold"), bg="#007acc", fg="white", command=enviar_mensaje, relief=tk.FLAT, padx=20, cursor="hand2")
-btn_enviar.pack(side=tk.RIGHT, fill=tk.Y)
+# Input de texto con borde hundido
+entrada_texto = tk.Entry(
+    frame_inferior, 
+    font=MC_FONT, 
+    bg="#3C3C3C", 
+    fg="#FFFFFF", 
+    insertbackground="white", 
+    borderwidth=3, 
+    relief=tk.SUNKEN
+)
+entrada_texto.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15), ipady=5)
+entrada_texto.bind("<Return>", enviar_mensaje)
+
+# Botón estilo bloque (Gris con borde en relieve grueso)
+btn_enviar = tk.Button(
+    frame_inferior, 
+    text="Craftear", 
+    font=MC_FONT, 
+    bg="#8B8B8B", 
+    activebackground="#A0A0A0",
+    fg="#000000", 
+    command=enviar_mensaje, 
+    borderwidth=5, 
+    relief=tk.RAISED,
+    cursor="hand2"
+)
+btn_enviar.pack(side=tk.RIGHT, ipadx=10)
 
 # Mensaje de bienvenida inicial
 bienvenida = (
-    "--- RESUMEN DE TU PERFIL CARGADO ---\n"
-    "Usuario: Osvaldo Salinas Aranda (20 años)\n"
-    "Formación: Ing. en Desarrollo de Software Multiplataforma (UTVT)\n"
-    "Proyectos destacados: LunaVet, LumaIA, ParcePet (JOZ Team).\n"
-    "------------------------------------\n\n"
-    "¡Hola Osvaldo! Soy tu tutor experto en Git y GitHub. Puedes escribir tu pregunta abajo o presionar 'Enter' para enviarla. ¿En qué te puedo ayudar hoy?"
+    "¡Jugador Osvaldo se unió a la partida!\n"
+    "Sistema cargado con experiencia en UTVT y JOZ Team.\n\n"
+    "Escribe tu duda sobre Git en la barra inferior para comenzar."
 )
-mostrar_en_chat("Sistema", bienvenida, "assistant")
+mostrar_en_chat("<Server>", bienvenida, "assistant")
 
-# Iniciar aplicación
 entrada_texto.focus()
 ventana.mainloop()
