@@ -13,7 +13,7 @@
 
 import ollama
 
-MODELO = "llama3.2"
+MODELO = "llama3.2:1b"
 
 # ------------------------------------------------------------
 # CONFIGURACIÓN DEL SISTEMA Y CONTEXTO DEL USUARIO
