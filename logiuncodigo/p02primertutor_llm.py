@@ -24,10 +24,14 @@ Debes:
 
 mensajes = [{"role": "system", "content": mensaje_sistema}]
 
+# Variable de estado para la barra de XP
+cargando_xp = False
+
 # ============================================================
 # FUNCIONES DE LA INTERFAZ
 # ============================================================
 def enviar_mensaje(event=None):
+    global cargando_xp
     pregunta = entrada_texto.get().strip()
     if not pregunta:
         return "break"
@@ -36,9 +40,14 @@ def enviar_mensaje(event=None):
     entrada_texto.delete(0, tk.END)
     mensajes.append({"role": "user", "content": pregunta})
     
+    # Bloquear interfaz
     entrada_texto.config(state=tk.DISABLED)
     btn_enviar.config(state=tk.DISABLED)
     ventana.title("Minecraft - Generando terreno (Pensando)...")
+    
+    # Iniciar animación de barra de experiencia
+    cargando_xp = True
+    animar_barra_xp()
     
     threading.Thread(target=obtener_respuesta_llm, daemon=True).start()
     return "break"
@@ -58,10 +67,34 @@ def obtener_respuesta_llm():
         ventana.after(0, reactivar_interfaz)
 
 def reactivar_interfaz():
+    global cargando_xp
+    cargando_xp = False # Esto detendrá el bucle de la animación
+    
     entrada_texto.config(state=tk.NORMAL)
     btn_enviar.config(state=tk.NORMAL)
     ventana.title("Tutor Inteligente de GitHub - Edición Bloques")
     entrada_texto.focus()
+
+def animar_barra_xp(progreso=0):
+    """Simula la barra de experiencia llenándose en un bucle."""
+    if not cargando_xp:
+        # Resetear barra a 0 cuando termine de cargar
+        xp_canvas.coords(xp_rect, 0, 0, 0, 15)
+        return
+    
+    ancho_total = xp_canvas.winfo_width()
+    # Calcular el ancho en píxeles basado en el % de progreso
+    ancho_actual = (ancho_total * progreso) / 100
+    
+    # Actualizar tamaño del rectángulo verde
+    xp_canvas.coords(xp_rect, 0, 0, ancho_actual, 15)
+    
+    # Aumentar progreso en "chunks" de 5% para que se vea ligeramente escalonado (retro)
+    nuevo_progreso = (progreso + 5) % 105
+    if nuevo_progreso == 100: 
+        nuevo_progreso = 0 # Reinicia al llegar al final
+        
+    ventana.after(60, animar_barra_xp, nuevo_progreso)
 
 def mostrar_en_chat(remitente, mensaje, tag):
     chat_historial.config(state=tk.NORMAL)
@@ -75,73 +108,59 @@ def mostrar_en_chat(remitente, mensaje, tag):
 # ============================================================
 ventana = tk.Tk()
 ventana.title("Tutor Inteligente de GitHub - Edición Bloques")
-ventana.geometry("800x600")
-# Fondo gris que simula piedra (Stone)
+ventana.geometry("800x650")
 ventana.configure(bg="#7B7B7B", padx=15, pady=15)
 
-# Fuente retro para simular píxeles
 MC_FONT = ("Courier New", 12, "bold")
 
-# Área de historial de chat (Fondo oscuro semitransparente clásico del juego)
+# Área de historial de chat
 chat_historial = scrolledtext.ScrolledText(
-    ventana, 
-    wrap=tk.WORD, 
-    font=MC_FONT, 
-    bg="#1E1E1E", 
-    fg="#FFFFFF", 
-    padx=15, 
-    pady=15, 
-    borderwidth=4, 
-    relief=tk.SUNKEN
+    ventana, wrap=tk.WORD, font=MC_FONT, bg="#1E1E1E", fg="#FFFFFF", 
+    padx=15, pady=15, borderwidth=4, relief=tk.SUNKEN
 )
-chat_historial.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+chat_historial.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-# Colores inspirados en el chat de Minecraft
-chat_historial.tag_config("user_name", foreground="#FFFF55") # Amarillo MC
+# Configuración de Tags de colores
+chat_historial.tag_config("user_name", foreground="#FFFF55") 
 chat_historial.tag_config("user", foreground="#FFFFFF")
-chat_historial.tag_config("assistant_name", foreground="#55FF55") # Verde claro MC
+chat_historial.tag_config("assistant_name", foreground="#55FF55") 
 chat_historial.tag_config("assistant", foreground="#D9D9D9")
-chat_historial.tag_config("error_name", foreground="#FF5555") # Rojo MC
+chat_historial.tag_config("error_name", foreground="#FF5555") 
 chat_historial.tag_config("error", foreground="#FF5555")
 chat_historial.config(state=tk.DISABLED)
 
-# Contenedor inferior
+# Contenedor inferior principal
 frame_inferior = tk.Frame(ventana, bg="#7B7B7B")
 frame_inferior.pack(fill=tk.X)
 
-# Label decorativo del input (El clásico ">" del chat)
-lbl_cursor = tk.Label(frame_inferior, text=">", font=MC_FONT, bg="#7B7B7B", fg="#FFFFFF")
+# --- NUEVA BARRA DE EXPERIENCIA (XP) ---
+# Un Canvas con fondo negro y borde pronunciado
+xp_canvas = tk.Canvas(frame_inferior, height=12, bg="#1E1E1E", highlightthickness=2, highlightbackground="#000000")
+xp_canvas.pack(fill=tk.X, padx=(45, 120), pady=(0, 10)) # Márgenes para alinearlo sobre la caja de texto
+# Rectángulo verde brillante inicial (ancho 0)
+xp_rect = xp_canvas.create_rectangle(0, 0, 0, 15, fill="#55FF55", width=0)
+
+# Contenedor para el Input y Botón
+frame_controles = tk.Frame(frame_inferior, bg="#7B7B7B")
+frame_controles.pack(fill=tk.X)
+
+lbl_cursor = tk.Label(frame_controles, text=">", font=MC_FONT, bg="#7B7B7B", fg="#FFFFFF")
 lbl_cursor.pack(side=tk.LEFT, padx=(0, 5))
 
-# Input de texto con borde hundido
 entrada_texto = tk.Entry(
-    frame_inferior, 
-    font=MC_FONT, 
-    bg="#3C3C3C", 
-    fg="#FFFFFF", 
-    insertbackground="white", 
-    borderwidth=3, 
-    relief=tk.SUNKEN
+    frame_controles, font=MC_FONT, bg="#3C3C3C", fg="#FFFFFF", 
+    insertbackground="white", borderwidth=3, relief=tk.SUNKEN
 )
 entrada_texto.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15), ipady=5)
 entrada_texto.bind("<Return>", enviar_mensaje)
 
-# Botón estilo bloque (Gris con borde en relieve grueso)
 btn_enviar = tk.Button(
-    frame_inferior, 
-    text="Craftear", 
-    font=MC_FONT, 
-    bg="#8B8B8B", 
-    activebackground="#A0A0A0",
-    fg="#000000", 
-    command=enviar_mensaje, 
-    borderwidth=5, 
-    relief=tk.RAISED,
-    cursor="hand2"
+    frame_controles, text="Craftear", font=MC_FONT, bg="#8B8B8B", activebackground="#A0A0A0",
+    fg="#000000", command=enviar_mensaje, borderwidth=5, relief=tk.RAISED, cursor="hand2"
 )
 btn_enviar.pack(side=tk.RIGHT, ipadx=10)
 
-# Mensaje de bienvenida inicial
+# Mensaje de bienvenida
 bienvenida = (
     "¡Jugador Osvaldo se unió a la partida!\n"
     "Sistema cargado con experiencia en UTVT y JOZ Team.\n\n"
