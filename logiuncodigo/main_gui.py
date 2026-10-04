@@ -304,4 +304,48 @@ entry_rag.bind("<Return>", enviar_pregunta_rag)
 btn_enviar_rag = tk.Button(frame_rag_input, text="Enviar Consulta", command=enviar_pregunta_rag, font=("Segoe UI", 11, "bold"), bg="#2563EB", fg="white", relief=tk.FLAT, cursor="hand2")
 btn_enviar_rag.pack(side=tk.RIGHT, ipady=4, ipadx=10)
 
+
+# ==========================================
+# PESTAÑA 4: MATRIZ DE RIESGOS ÉTICOS E IA
+# ==========================================
+frame_etica = tk.Frame(notebook, bg="#FFFFFF", padx=20, pady=20)
+notebook.add(frame_etica, text="Auditoría y Riesgos Éticos")
+
+tk.Label(frame_etica, text="Matriz de Riesgos y Mitigación (IA en Logística)", font=("Segoe UI", 14, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 5))
+tk.Label(frame_etica, text="Documentación oficial de impacto ético, sesgos y alucinaciones del modelo Llama 3.2.", font=FONT_NORM, bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 15))
+
+# Estilo para la tabla (Treeview)
+estilo.configure("Treeview", font=("Segoe UI", 10), rowheight=30, background="#F8FAFC", fieldbackground="#F8FAFC")
+estilo.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#E2E8F0", foreground="#1E293B")
+
+# Crear tabla
+columnas = ("Riesgo", "Categoría", "Impacto", "Estrategia de Mitigación")
+tabla_riesgos = ttk.Treeview(frame_etica, columns=columnas, show="headings", height=10)
+
+# Configurar anchos de columna
+tabla_riesgos.column("Riesgo", width=250, anchor="w")
+tabla_riesgos.column("Categoría", width=120, anchor="center")
+tabla_riesgos.column("Impacto", width=100, anchor="center")
+tabla_riesgos.column("Estrategia de Mitigación", width=400, anchor="w")
+
+for col in columnas:
+    tabla_riesgos.heading(col, text=col)
+
+tabla_riesgos.pack(fill="both", expand=True, pady=10)
+
+# Datos de la matriz ética (Alineados al proyecto LogiSmart)
+riesgos_datos = [
+    ("Alucinación en Clasificación de Correos", "Técnico / IA", "Alto", "Uso de clasificador híbrido estático si el JSON del LLM falla o es inválido."),
+    ("Sesgo en Priorización de Incidentes", "Ético", "Medio", "Auditoría humana semanal sobre las prioridades asignadas automáticamente."),
+    ("Falsos Positivos en RAG (Inventar datos)", "Operativo", "Alto", "Inyección estricta del contexto de MongoDB y prompt restringido a 'no inventar'."),
+    ("Privacidad de Operadores (Correos)", "Privacidad", "Crítico", "Filtrado de datos sensibles en el backend antes de enviar el prompt al LLM local."),
+    ("Caída del Servicio LLM (Ollama OOM)", "Técnico", "Medio", "Implementación del modelo ligero 1b y captura de excepciones (try/except) en hilos.")
+]
+
+for riesgo in riesgos_datos:
+    tabla_riesgos.insert("", tk.END, values=riesgo)
+
+# Etiqueta de pie de página
+tk.Label(frame_etica, text="Generado por el equipo JOZ Team - Cumplimiento de directrices de IA Responsable.", font=("Segoe UI", 10, "italic"), bg="#FFFFFF", fg="#94A3B8").pack(anchor="e", pady=(10, 0))
+
 ventana.mainloop()
