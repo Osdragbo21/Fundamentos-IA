@@ -104,12 +104,17 @@ def enviar_pregunta_rag(event=None):
 
     def tarea_rag():
         try:
-            # 1. Recuperación de datos desde MongoDB (Excluimos el _id para evitar errores de parseo en la IA)
+            # 1. Recuperación de datos
             ultimos_accesos = list(accesos_col.find({}, {"_id": 0}).sort("marca_tiempo", -1).limit(5)) if accesos_col is not None else []
             ultimos_incidentes = list(incidentes_col.find({}, {"_id": 0}).sort("fecha_reporte", -1).limit(5)) if incidentes_col is not None else []
 
-            # 2. Construir el contexto en formato texto
-            contexto_bd = f"Últimos 5 accesos registrados:\n{ultimos_accesos}\n\nÚltimos 5 incidentes registrados:\n{ultimos_incidentes}"
+            # --- LA SOLUCIÓN: Limpiar los datos a texto JSON comprensible para la IA ---
+            import json
+            accesos_limpios = json.dumps(ultimos_accesos, ensure_ascii=False, default=str)
+            incidentes_limpios = json.dumps(ultimos_incidentes, ensure_ascii=False, default=str)
+
+            # 2. Construir el contexto con los datos ya limpios
+            contexto_bd = f"Últimos accesos:\n{accesos_limpios}\n\nÚltimos incidentes:\n{incidentes_limpios}"
             
             # 3. Armar el Prompt Híbrido (RAG)
             prompt = f"""Eres el Asistente RAG de LogiSmart. 
@@ -347,5 +352,74 @@ for riesgo in riesgos_datos:
 
 # Etiqueta de pie de página
 tk.Label(frame_etica, text="Generado por el equipo JOZ Team - Cumplimiento de directrices de IA Responsable.", font=("Segoe UI", 10, "italic"), bg="#FFFFFF", fg="#94A3B8").pack(anchor="e", pady=(10, 0))
+
+
+# ==========================================
+# PESTAÑA 5: HISTORIAL DE INCIDENTES (BASE DE DATOS)
+# ==========================================
+frame_historial = tk.Frame(notebook, bg="#FFFFFF", padx=20, pady=20)
+notebook.add(frame_historial, text="Historial de Incidentes")
+
+tk.Label(frame_historial, text="Bandeja Histórica de Incidentes Registrados", font=("Segoe UI", 14, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 5))
+tk.Label(frame_historial, text="Visualización en tiempo real de los reportes almacenados directamente en MongoDB Atlas.", font=FONT_NORM, bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 15))
+
+# Marco superior para el botón de actualizar
+frame_controles_hist = tk.Frame(frame_historial, bg="#FFFFFF")
+frame_controles_hist.pack(fill="x", pady=(0, 10))
+
+# Definir la estructura de la tabla
+columnas_hist = ("Fecha del Reporte", "Clasificación", "Prioridad", "Placa", "Ubicación")
+tabla_historial = ttk.Treeview(frame_historial, columns=columnas_hist, show="headings", height=15)
+
+tabla_historial.column("Fecha del Reporte", width=150, anchor="center")
+tabla_historial.column("Clasificación", width=150, anchor="w")
+tabla_historial.column("Prioridad", width=100, anchor="center")
+tabla_historial.column("Placa", width=120, anchor="center")
+tabla_historial.column("Ubicación", width=250, anchor="w")
+
+for col in columnas_hist:
+    tabla_historial.heading(col, text=col)
+
+tabla_historial.pack(fill="both", expand=True)
+
+def actualizar_tabla_historial():
+    """Consulta los últimos 50 incidentes en MongoDB y los dibuja en la tabla."""
+    # Limpiar tabla actual
+    for item in tabla_historial.get_children():
+        tabla_historial.delete(item)
+    
+    # Consultar base de datos
+    try:
+        from database import incidentes_col
+        if incidentes_col is not None:
+            # Traer los más recientes primero
+            registros = incidentes_col.find().sort("fecha_reporte", -1).limit(50)
+            
+            for reg in registros:
+                # Extraer la fecha manejando diferentes formatos
+                fecha = reg.get("fecha_reporte", "")
+                if isinstance(fecha, str):
+                    fecha_str = fecha[:16] # Cortar milisegundos
+                else:
+                    fecha_str = fecha.strftime("%Y-%m-%d %H:%M") 
+                    
+                clasif = reg.get("clasificacion", "N/A")
+                prio = reg.get("prioridad", "N/A")
+                
+                # Extraer datos anidados por la IA
+                datos = reg.get("datos_extraidos", {})
+                placa = datos.get("placa", "N/A")
+                ubica = datos.get("ubicacion", "N/A")
+                
+                tabla_historial.insert("", tk.END, values=(fecha_str, clasif, prio, placa, ubica))
+    except Exception as e:
+        messagebox.showerror("Error de BD", f"No se pudo cargar el historial: {e}")
+
+# Botón para refrescar la tabla manualmente
+btn_actualizar = tk.Button(frame_controles_hist, text="🔄 Refrescar Bandeja", command=actualizar_tabla_historial, font=("Segoe UI", 10, "bold"), bg="#10B981", fg="white", relief=tk.FLAT, cursor="hand2")
+btn_actualizar.pack(side=tk.RIGHT, ipadx=15, ipady=5)
+
+# Cargar los datos automáticamente al abrir el programa
+actualizar_tabla_historial()
 
 ventana.mainloop()
