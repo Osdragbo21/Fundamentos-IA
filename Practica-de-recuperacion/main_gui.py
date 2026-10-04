@@ -293,47 +293,65 @@ btn_enviar_rag = tk.Button(frame_rag_input, text="Enviar Consulta", command=envi
 btn_enviar_rag.pack(side=tk.RIGHT, ipady=4, ipadx=10, padx=5)
 
 # === PESTAÑA 4: MATRIZ DE RIESGOS ===
+# ==========================================
+# PESTAÑA 4: MATRIZ DE RIESGOS ÉTICOS
+# ==========================================
 frame_etica = tk.Frame(notebook, bg="#FFFFFF", padx=20, pady=20)
 notebook.add(frame_etica, text="Matriz de Riesgos")
 
+# Panel dividido: Izquierda (Tabla y Controles) | Derecha (Gráfica)
 paned_etica = tk.PanedWindow(frame_etica, orient=tk.HORIZONTAL, bg="#E2E8F0", sashwidth=5)
 paned_etica.pack(fill="both", expand=True)
 
+# --- SECCIÓN IZQUIERDA: TABLA Y CONTROLES ---
 frame_crud_etica = tk.Frame(paned_etica, bg="#FFFFFF")
 paned_etica.add(frame_crud_etica, minsize=500)
 
 tk.Label(frame_crud_etica, text="Gestión de Riesgos Éticos (IA)", font=FONT_TITLE, bg="#FFFFFF").pack(anchor="w", pady=(0,5))
 tk.Label(frame_crud_etica, text="Tabla de riesgos y estrategias de mitigación implementadas en el sistema.", font=("Segoe UI", 10), bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 10))
 
+# Configuración de la tabla (Treeview)
 columnas_etica = ("Riesgo", "Categoría", "Puntaje Inicial", "Puntaje Residual", "Mitigación")
 tabla_riesgos = ttk.Treeview(frame_crud_etica, columns=columnas_etica, show="headings", height=6)
-tabla_riesgos.column("Riesgo", width=180)
-tabla_riesgos.column("Categoría", width=80)
-tabla_riesgos.column("Puntaje Inicial", width=100, anchor="center")
-tabla_riesgos.column("Puntaje Residual", width=100, anchor="center")
-tabla_riesgos.column("Mitigación", width=200)
-for col in columnas_etica: tabla_riesgos.heading(col, text=col)
+
+# Dimensiones de las columnas
+tabla_riesgos.column("Riesgo", width=280, minwidth=250)
+tabla_riesgos.column("Categoría", width=100, minwidth=80, anchor="center")
+tabla_riesgos.column("Puntaje Inicial", width=100, minwidth=100, anchor="center")
+tabla_riesgos.column("Puntaje Residual", width=100, minwidth=100, anchor="center")
+tabla_riesgos.column("Mitigación", width=380, minwidth=300)
+
+# Asignar encabezados
+for col in columnas_etica: 
+    tabla_riesgos.heading(col, text=col)
 tabla_riesgos.pack(fill="x", pady=5)
 
+# Cargar los datos base de nuestra implementación
 datos_base_etica = [
     ("Alucinaciones del LLM en clasificación", "Técnico", 9, 3, "Clasificador estático de respaldo (Híbrido)."),
     ("Sesgo en correos con ortografía informal", "Ético", 7, 2, "Auditoría humana en prioridades Altas."),
     ("Privacidad de datos del conductor", "Legal", 10, 4, "Ejecución de Ollama 100% en local (sin internet)."),
-    ("Dependencia excesiva automatización", "Operativo", 8, 3, "El operador toma decisión final con semáforo.")
+    ("Dependencia excesiva a la automatización", "Operativo", 8, 3, "El operador toma decisión final con semáforo.")
 ]
-for d in datos_base_etica: tabla_riesgos.insert("", tk.END, values=d)
+for d in datos_base_etica: 
+    tabla_riesgos.insert("", tk.END, values=d)
 
+# --- SECCIÓN DERECHA: GRÁFICA DE MATPLOTLIB ---
 frame_grafica = tk.Frame(paned_etica, bg="#F8FAFC")
 paned_etica.add(frame_grafica, minsize=400)
 
+# Inicializar figura de Matplotlib
 figura, ax = plt.subplots(figsize=(5, 4), dpi=100)
 canvas_grafica = FigureCanvasTkAgg(figura, frame_grafica)
 canvas_grafica.get_tk_widget().pack(fill="both", expand=True, pady=10)
 
 def actualizar_grafica_riesgos():
+    """Función para extraer datos de la tabla y dibujar la gráfica comparativa"""
     nombres, iniciales, residuales = [], [], []
+    
     for item in tabla_riesgos.get_children():
         valores = tabla_riesgos.item(item)['values']
+        # Recortar el nombre para que quepa en el eje X
         nombres.append(str(valores[0])[:15] + "..")
         iniciales.append(int(valores[2]))
         residuales.append(int(valores[3]))
@@ -342,28 +360,36 @@ def actualizar_grafica_riesgos():
     x = range(len(nombres))
     ancho = 0.35
     
+    # Dibujar barras (Roja para inicial, Verde para mitigado)
     ax.bar([i - ancho/2 for i in x], iniciales, ancho, label='Riesgo Inicial', color='#EF4444')
     ax.bar([i + ancho/2 for i in x], residuales, ancho, label='Riesgo Residual', color='#10B981')
     
+    # Etiquetas y estilos de la gráfica
     ax.set_ylabel('Nivel de Impacto (1-10)')
     ax.set_title('Matriz de Mitigación de Riesgos')
     ax.set_xticks(x)
     ax.set_xticklabels(nombres, rotation=15, ha="right", fontsize=8)
     ax.legend()
+    
     figura.tight_layout()
     canvas_grafica.draw()
 
 def eliminar_riesgo():
+    """Permite al usuario borrar un riesgo de la tabla y actualizar la gráfica"""
     seleccion = tabla_riesgos.selection()
     if not seleccion:
         messagebox.showwarning("Atención", "Selecciona un riesgo de la tabla para eliminar.")
         return
-    for item in seleccion: tabla_riesgos.delete(item)
+    for item in seleccion: 
+        tabla_riesgos.delete(item)
+    # Refrescar gráfica tras eliminar
     actualizar_grafica_riesgos()
 
+# Botón para interactuar con la tabla
 tk.Button(frame_crud_etica, text="Eliminar Riesgo Seleccionado", command=eliminar_riesgo, bg="#EF4444", fg="white").pack(anchor="e", pady=5)
-actualizar_grafica_riesgos()
 
+# Renderizar la gráfica automáticamente al iniciar la aplicación
+actualizar_grafica_riesgos()
 
 # === PESTAÑA 5: HISTORIAL ===
 frame_historial = tk.Frame(notebook, bg="#FFFFFF", padx=20, pady=20)

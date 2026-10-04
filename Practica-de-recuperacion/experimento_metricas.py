@@ -94,16 +94,19 @@ print(f"Latencia promedio por correo: {latencia_promedio:.2f} segundos")
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 # Gráfico 1: Exactitud
-ax1.bar(['Reglas Estáticas', 'Híbrido (Llama 3.2)'], [exactitud_estatico, exactitud_hibrido], color=['#EF4444', '#10B981'])
-ax1.set_title('Comparativa de Exactitud (30 Correos)')
+barras = ax1.bar(['Reglas Estáticas', 'Híbrido (Llama 3.2)'], [exactitud_estatico, exactitud_hibrido], color=['#EF4444', '#10B981'])
+ax1.set_title('Comparativa de Exactitud (30 Correos)', fontweight="bold")
 ax1.set_ylabel('Porcentaje de Aciertos (%)')
-ax1.set_ylim(0, 100)
+ax1.set_ylim(0, 110)
+for barra in barras:
+    yval = barra.get_height()
+    ax1.text(barra.get_x() + barra.get_width()/2, yval + 2, f"{yval:.1f}%", ha='center', va='bottom', fontweight="bold")
 
 # Gráfico 2: Latencia
-ax2.plot(range(1, 31), latencias, marker='o', color='#3B82F6')
-ax2.set_title(f'Latencia del LLM (Promedio: {latencia_promedio:.2f}s)')
+ax2.plot(range(1, 31), latencias, marker='o', color='#3B82F6', linewidth=2)
+ax2.set_title(f'Latencia del LLM local (Promedio: {latencia_promedio:.2f}s)', fontweight="bold")
 ax2.set_xlabel('Número de Correo Procesado')
-ax2.set_ylabel('Segundos')
+ax2.set_ylabel('Tiempo de respuesta (Segundos)')
 ax2.grid(True, linestyle='--', alpha=0.6)
 
 plt.tight_layout()
