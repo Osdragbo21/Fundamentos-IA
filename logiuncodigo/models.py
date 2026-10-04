@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from datetime import datetime
 
 class Camion(BaseModel):
@@ -15,9 +15,8 @@ class Acceso(BaseModel):
     Q: bool
     R: bool
     S: bool
-    # Nuevas variables que agregaremos en la Fase 2:
-    # T: bool (Horario permitido)
-    # U: bool (Seguro vigente)
+    T: bool  # Horario permitido
+    U: bool  # Seguro vigente
     resultado_A: bool
     resultado_E: bool
     operador: str
