@@ -6,7 +6,7 @@ import threading
 # Importar módulos backend
 from motor_reglas import evaluar_camion_extendido
 from clasificador_ia import procesar_incidente
-from database import accesos_col, incidentes_col  # Importación crucial para RAG
+from database import accesos_col, incidentes_col
 import ollama
 
 # ==========================================
@@ -85,13 +85,11 @@ def mostrar_resultado_clasificacion(resultado):
     text_json_crudo.config(state=tk.DISABLED)
     btn_clasificar.config(state=tk.NORMAL, text="Procesar Incidente")
 
-# --- NUEVAS FUNCIONES RAG ---
 def enviar_pregunta_rag(event=None):
     pregunta = entry_rag.get().strip()
     if not pregunta:
         return
 
-    # Mostrar pregunta en el chat
     chat_rag.config(state=tk.NORMAL)
     chat_rag.insert(tk.END, f"👤 Operador: ", "user_name")
     chat_rag.insert(tk.END, f"{pregunta}\n\n", "user")
@@ -104,19 +102,15 @@ def enviar_pregunta_rag(event=None):
 
     def tarea_rag():
         try:
-            # 1. Recuperación de datos
             ultimos_accesos = list(accesos_col.find({}, {"_id": 0}).sort("marca_tiempo", -1).limit(5)) if accesos_col is not None else []
             ultimos_incidentes = list(incidentes_col.find({}, {"_id": 0}).sort("fecha_reporte", -1).limit(5)) if incidentes_col is not None else []
 
-            # --- LA SOLUCIÓN: Limpiar los datos a texto JSON comprensible para la IA ---
             import json
             accesos_limpios = json.dumps(ultimos_accesos, ensure_ascii=False, default=str)
             incidentes_limpios = json.dumps(ultimos_incidentes, ensure_ascii=False, default=str)
 
-            # 2. Construir el contexto con los datos ya limpios
             contexto_bd = f"Últimos accesos:\n{accesos_limpios}\n\nÚltimos incidentes:\n{incidentes_limpios}"
             
-            # 3. Armar el Prompt Híbrido (RAG)
             prompt = f"""Eres el Asistente RAG de LogiSmart. 
             Responde a la pregunta del operador basándote ÚNICAMENTE en el siguiente contexto extraído en tiempo real de MongoDB.
             Si la respuesta no está en el contexto, indica claramente que no tienes registros sobre eso. Sé conciso y profesional.
@@ -127,7 +121,6 @@ def enviar_pregunta_rag(event=None):
             [PREGUNTA DEL OPERADOR]: {pregunta}
             """
             
-            # 4. Llamada al LLM
             respuesta = ollama.chat(model="llama3.2:1b", messages=[{"role": "user", "content": prompt}])
             texto_respuesta = respuesta["message"]["content"]
             
@@ -148,6 +141,32 @@ def mostrar_respuesta_rag(respuesta):
     btn_enviar_rag.config(state=tk.NORMAL, text="Enviar Consulta")
     entry_rag.config(state=tk.NORMAL)
     entry_rag.focus()
+
+def actualizar_tabla_historial():
+    for item in tabla_historial.get_children():
+        tabla_historial.delete(item)
+    
+    try:
+        if incidentes_col is not None:
+            registros = incidentes_col.find().sort("fecha_reporte", -1).limit(50)
+            for reg in registros:
+                fecha = reg.get("fecha_reporte", "")
+                fecha_str = fecha[:16] if isinstance(fecha, str) else fecha.strftime("%Y-%m-%d %H:%M") 
+                    
+                clasif = reg.get("clasificacion", "N/A")
+                prio = reg.get("prioridad", "N/A")
+                
+                datos = reg.get("datos_extraidos", {})
+                placa = datos.get("placa", "N/A")
+                ubica = datos.get("ubicacion", "N/A")
+                
+                tabla_historial.insert("", tk.END, values=(fecha_str, clasif, prio, placa, ubica))
+    except Exception as e:
+        messagebox.showerror("Error de BD", f"No se pudo cargar el historial: {e}")
+
+def navegar_a(index):
+    """Cambia la pestaña activa del Notebook según el índice proporcionado."""
+    notebook.select(index)
 
 # ==========================================
 # CONFIGURACIÓN VISUAL Y VENTANA MAXIMIZADA
@@ -173,6 +192,39 @@ notebook.pack(pady=15, padx=15, expand=True, fill="both")
 
 FONT_TITLE = ("Segoe UI", 12, "bold")
 FONT_NORM = ("Segoe UI", 11)
+
+# ==========================================
+# PESTAÑA 0: INICIO (HOME / DASHBOARD)
+# ==========================================
+frame_inicio = tk.Frame(notebook, bg="#FFFFFF")
+notebook.add(frame_inicio, text="🏠 Inicio")
+
+container_inicio = tk.Frame(frame_inicio, bg="#FFFFFF", padx=40, pady=40)
+container_inicio.pack(expand=True, fill="both")
+
+tk.Label(container_inicio, text="Bienvenido a LogiSmart", font=("Segoe UI", 24, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 10))
+tk.Label(container_inicio, text="Centro de Control Inteligente para gestión logística, evaluación de accesos vehiculares y análisis de incidentes impulsado por Llama 3.2.", font=("Segoe UI", 12), bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 30))
+
+frame_cards = tk.Frame(container_inicio, bg="#FFFFFF")
+frame_cards.pack(fill="both", expand=True)
+
+secciones = [
+    ("🚦 Control de Accesos", "Evalúa requisitos de ingreso (certificaciones, peso, horarios) mediante un motor lógico y genera trazabilidad.", 1),
+    ("🤖 Análisis de Incidentes (IA)", "Extrae datos estructurados (placa, ubicación, prioridad) desde reportes de texto libre utilizando Inteligencia Artificial.", 2),
+    ("💬 Asistente RAG", "Realiza consultas en lenguaje natural a la base de datos de MongoDB para obtener reportes de la operación.", 3),
+    ("🛡️ Auditoría y Ética", "Documentación oficial sobre prevención de alucinaciones, mitigación de sesgos y privacidad de datos.", 4),
+    ("🗄️ Historial MongoDB", "Bandeja dinámica que visualiza en tiempo real los incidentes y alertas almacenadas en el clúster.", 5)
+]
+
+for i, (titulo, desc, index) in enumerate(secciones):
+    card = tk.Frame(frame_cards, bg="#F8FAFC", padx=20, pady=20, highlightbackground="#E2E8F0", highlightthickness=1)
+    # Distribuir en 2 columnas
+    card.grid(row=i//2, column=i%2, padx=10, pady=10, sticky="nsew")
+    frame_cards.grid_columnconfigure(i%2, weight=1)
+
+    tk.Label(card, text=titulo, font=("Segoe UI", 14, "bold"), bg="#F8FAFC", fg="#2563EB").pack(anchor="w")
+    tk.Label(card, text=desc, font=("Segoe UI", 10), bg="#F8FAFC", fg="#475569", wraplength=400, justify="left").pack(anchor="w", pady=(5, 15))
+    tk.Button(card, text="Ir a la sección →", command=lambda idx=index: navegar_a(idx), font=("Segoe UI", 10, "bold"), bg="#E2E8F0", fg="#1E293B", relief=tk.FLAT, cursor="hand2", padx=10, pady=5).pack(anchor="w")
 
 # ==========================================
 # PESTAÑA 1: CONTROL DE ACCESOS
@@ -288,7 +340,6 @@ notebook.add(frame_rag_tab, text="Asistente RAG (Consultas BD)")
 tk.Label(frame_rag_tab, text="Consulta a la Base de Datos con Lenguaje Natural", font=("Segoe UI", 14, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 5))
 tk.Label(frame_rag_tab, text="Haz preguntas sobre los accesos o incidentes recientes (ej. '¿Qué pasó con el camión sab-2026?')", font=FONT_NORM, bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 15))
 
-# Área de Chat
 chat_rag = scrolledtext.ScrolledText(frame_rag_tab, font=FONT_NORM, bg="#F8FAFC", fg="#0F172A", relief=tk.SOLID, borderwidth=1, padx=15, pady=15)
 chat_rag.pack(fill="both", expand=True, pady=(0, 15))
 
@@ -298,7 +349,6 @@ chat_rag.tag_config("ai_name", foreground="#059669", font=("Segoe UI", 11, "bold
 chat_rag.tag_config("ai", foreground="#1E293B")
 chat_rag.config(state=tk.DISABLED)
 
-# Controles de Input
 frame_rag_input = tk.Frame(frame_rag_tab, bg="#FFFFFF")
 frame_rag_input.pack(fill="x")
 
@@ -309,7 +359,6 @@ entry_rag.bind("<Return>", enviar_pregunta_rag)
 btn_enviar_rag = tk.Button(frame_rag_input, text="Enviar Consulta", command=enviar_pregunta_rag, font=("Segoe UI", 11, "bold"), bg="#2563EB", fg="white", relief=tk.FLAT, cursor="hand2")
 btn_enviar_rag.pack(side=tk.RIGHT, ipady=4, ipadx=10)
 
-
 # ==========================================
 # PESTAÑA 4: MATRIZ DE RIESGOS ÉTICOS E IA
 # ==========================================
@@ -319,15 +368,12 @@ notebook.add(frame_etica, text="Auditoría y Riesgos Éticos")
 tk.Label(frame_etica, text="Matriz de Riesgos y Mitigación (IA en Logística)", font=("Segoe UI", 14, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 5))
 tk.Label(frame_etica, text="Documentación oficial de impacto ético, sesgos y alucinaciones del modelo Llama 3.2.", font=FONT_NORM, bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 15))
 
-# Estilo para la tabla (Treeview)
 estilo.configure("Treeview", font=("Segoe UI", 10), rowheight=30, background="#F8FAFC", fieldbackground="#F8FAFC")
 estilo.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#E2E8F0", foreground="#1E293B")
 
-# Crear tabla
 columnas = ("Riesgo", "Categoría", "Impacto", "Estrategia de Mitigación")
 tabla_riesgos = ttk.Treeview(frame_etica, columns=columnas, show="headings", height=10)
 
-# Configurar anchos de columna
 tabla_riesgos.column("Riesgo", width=250, anchor="w")
 tabla_riesgos.column("Categoría", width=120, anchor="center")
 tabla_riesgos.column("Impacto", width=100, anchor="center")
@@ -338,7 +384,6 @@ for col in columnas:
 
 tabla_riesgos.pack(fill="both", expand=True, pady=10)
 
-# Datos de la matriz ética (Alineados al proyecto LogiSmart)
 riesgos_datos = [
     ("Alucinación en Clasificación de Correos", "Técnico / IA", "Alto", "Uso de clasificador híbrido estático si el JSON del LLM falla o es inválido."),
     ("Sesgo en Priorización de Incidentes", "Ético", "Medio", "Auditoría humana semanal sobre las prioridades asignadas automáticamente."),
@@ -350,9 +395,7 @@ riesgos_datos = [
 for riesgo in riesgos_datos:
     tabla_riesgos.insert("", tk.END, values=riesgo)
 
-# Etiqueta de pie de página
 tk.Label(frame_etica, text="Generado por el equipo JOZ Team - Cumplimiento de directrices de IA Responsable.", font=("Segoe UI", 10, "italic"), bg="#FFFFFF", fg="#94A3B8").pack(anchor="e", pady=(10, 0))
-
 
 # ==========================================
 # PESTAÑA 5: HISTORIAL DE INCIDENTES (BASE DE DATOS)
@@ -363,11 +406,9 @@ notebook.add(frame_historial, text="Historial de Incidentes")
 tk.Label(frame_historial, text="Bandeja Histórica de Incidentes Registrados", font=("Segoe UI", 14, "bold"), bg="#FFFFFF", fg="#1E293B").pack(anchor="w", pady=(0, 5))
 tk.Label(frame_historial, text="Visualización en tiempo real de los reportes almacenados directamente en MongoDB Atlas.", font=FONT_NORM, bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(0, 15))
 
-# Marco superior para el botón de actualizar
 frame_controles_hist = tk.Frame(frame_historial, bg="#FFFFFF")
 frame_controles_hist.pack(fill="x", pady=(0, 10))
 
-# Definir la estructura de la tabla
 columnas_hist = ("Fecha del Reporte", "Clasificación", "Prioridad", "Placa", "Ubicación")
 tabla_historial = ttk.Treeview(frame_historial, columns=columnas_hist, show="headings", height=15)
 
@@ -382,44 +423,9 @@ for col in columnas_hist:
 
 tabla_historial.pack(fill="both", expand=True)
 
-def actualizar_tabla_historial():
-    """Consulta los últimos 50 incidentes en MongoDB y los dibuja en la tabla."""
-    # Limpiar tabla actual
-    for item in tabla_historial.get_children():
-        tabla_historial.delete(item)
-    
-    # Consultar base de datos
-    try:
-        from database import incidentes_col
-        if incidentes_col is not None:
-            # Traer los más recientes primero
-            registros = incidentes_col.find().sort("fecha_reporte", -1).limit(50)
-            
-            for reg in registros:
-                # Extraer la fecha manejando diferentes formatos
-                fecha = reg.get("fecha_reporte", "")
-                if isinstance(fecha, str):
-                    fecha_str = fecha[:16] # Cortar milisegundos
-                else:
-                    fecha_str = fecha.strftime("%Y-%m-%d %H:%M") 
-                    
-                clasif = reg.get("clasificacion", "N/A")
-                prio = reg.get("prioridad", "N/A")
-                
-                # Extraer datos anidados por la IA
-                datos = reg.get("datos_extraidos", {})
-                placa = datos.get("placa", "N/A")
-                ubica = datos.get("ubicacion", "N/A")
-                
-                tabla_historial.insert("", tk.END, values=(fecha_str, clasif, prio, placa, ubica))
-    except Exception as e:
-        messagebox.showerror("Error de BD", f"No se pudo cargar el historial: {e}")
-
-# Botón para refrescar la tabla manualmente
 btn_actualizar = tk.Button(frame_controles_hist, text="🔄 Refrescar Bandeja", command=actualizar_tabla_historial, font=("Segoe UI", 10, "bold"), bg="#10B981", fg="white", relief=tk.FLAT, cursor="hand2")
 btn_actualizar.pack(side=tk.RIGHT, ipadx=15, ipady=5)
 
-# Cargar los datos automáticamente al abrir el programa
 actualizar_tabla_historial()
 
 ventana.mainloop()
